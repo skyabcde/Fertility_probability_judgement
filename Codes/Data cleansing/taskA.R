@@ -14,7 +14,7 @@ theme_set(theme_classic())
 
 #----------------------------------------------------------------------------------------------------
 # Fertililty patients dataset.
-fertility_patient = here::here("Dataset/FP_n281.sav")
+fertility_patient = here::here(".git/Dataset/FP_n281.sav")
 fp_all = haven::read_sav(fertility_patient)
 
 colnames(fp_all) %>%
@@ -103,6 +103,7 @@ expand.grid(id1 = fp$id, id2 = 14) %>%
     !is.na(best_cor) 
   ) -> cor_best_taska
 
+#Plot the relation between the mean correlation and item correlation. 
 cor_best_taska %>% 
   left_join(cors_item_taska, by="id1") -> joined_cor_best_item_taska
 joined_cor_best_item_taska %>% ggplot(aes(best_cor, item_string_cor)) +
@@ -189,15 +190,14 @@ fp_reverser_flipped %>%
   add_column(id = fp_reverser$id) %>%
   add_column(item_string = fp_reverser$item_string) -> fp_reverser_flipped
 
-
 fp_most %>% 
   add_row(fp_reverser_flipped) %>%
   add_row(fp_best_14)-> fp_taska
 
 # Save the cleansed task A data from patients. 
-write.csv(fp_taska, "Dataset/fp_taska.csv", row.names=FALSE)
+write.csv(fp_taska, ".git/Dataset/fp_taska.csv", row.names=FALSE)
 
-fertility_patient = here::here("Dataset/fp_taska.csv")
+fertility_patient = here::here(".git/Dataset/fp_taska.csv")
 fp_taska <- read.csv(fertility_patient)
 
 colnames(fp_taska) %>%
@@ -254,7 +254,7 @@ fp_a_after_median <- apply(fp_taska, 2, median, na.rm=TRUE)
 
 #----------------------------------------------------------------------------------------------------
 # Health care professional dataset.
-fertility_doctors = here::here("Dataset/HCP_n263.sav")
+fertility_doctors = here::here(".git/Dataset/HCP_n263.sav")
 hcp_all = haven::read_sav(fertility_doctors)
 
 colnames(hcp_all) %>%
@@ -287,6 +287,7 @@ cor_all_taska %>%
   arrange(mean_cor) %>% 
   mutate(rank_cor = row_number()) -> cor_ave_taska 
 
+# Plotting over the pairwise correlations. 
 cor_all_taska %>%
   as_tibble() %>%
   mutate(
@@ -370,6 +371,7 @@ shape_par
 pi_par <- exp(parameter_esti_taska$par[3:4]) 
 pi_par
 
+# Plot the curves of each distribution. 
 curve(0.8749822*0.5*dbeta((x+1)/2, shape2 = shape_par[1], shape1 = shape_par[2]),from=-1, to=1, col="blue",add=TRUE)
 curve(0.02637576*0.5*dbeta((x+1)/2, shape1 = shape_par[1], shape2 = shape_par[2]),from=-1, to=1, col="red",add=TRUE)
 n=15
@@ -432,9 +434,10 @@ hcp_most %>%
   add_row(hcp_reverser_flipped) %>%
   add_row(hcp_best_33) -> hcp_taska
 
-write.csv(hcp_taska, "Dataset/hcp_taska.csv")
+# Save the cleansed task A data from doctors. 
+write.csv(hcp_taska, ".git/Dataset/hcp_taska.csv")
 
-fertility_doctors = here::here("Dataset/hcp_taska.csv")
+fertility_doctors = here::here(".git/Dataset/hcp_taska.csv")
 hcp_taska <- read.csv(fertility_doctors)
 
 colnames(hcp_taska) %>%
