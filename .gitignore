@@ -8,7 +8,8 @@
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
 
 # Thumbnails
 ._*
@@ -118,3 +119,10 @@ fastlane/test_output
 iOSInjectionProject/
 
 # End of https://www.toptal.com/developers/gitignore/api/swift,macos
+
+/Fertility_probability_judgement/Dataset/FP_n281.sav
+/Fertility_probability_judgement/Dataset/HCP_n263.sav
+/Fertility_probability_judgement/Dataset/fp_taska.csv
+/Fertility_probability_judgement/Dataset/fp_taskb.csv
+/Fertility_probability_judgement/Dataset/hcp_taska.csv
+/Fertility_probability_judgement/Dataset/hcp_taskb.csv
