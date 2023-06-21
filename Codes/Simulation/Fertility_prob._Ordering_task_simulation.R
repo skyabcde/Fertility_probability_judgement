@@ -14,15 +14,27 @@ theme_set(theme_bw())
 theme_set(theme_classic())
 
 
-# Load Fertililty patients dataset.
-fertility_patient = here::here("datasets/FP_n281.sav")
+# Load Fertility Patients (FP) dataset.
+fertility_patient = here::here("Fertility_probability_judgement/Dataset/FP_n281.sav")
 fp_all = haven::read_sav(fertility_patient)
 
+# Load Fertility Health Care Professional (HCP) dataset.
+fertility_doctors = here::here("Fertility_probability_judgement/Dataset/HCP_n263.sav")
+hcp_all = haven::read_sav(fertility_doctors)
+
+# Organize datasets.
 colnames(fp_all) %>%
   grepl(pattern = '^task_a_') %>%
-  which() -> task_a_columns_1
+  which() -> task_a_columns_fp
 fp <- fp_all %>%
-  select(task_a_columns_1, item_string)  %>%
+  select(task_a_columns_fp, item_string)  %>%
+  mutate(id = row_number())
+
+colnames(hcp_all) %>%
+  grepl(pattern = '^task_a_') %>%
+  which() -> task_a_columns_hcp
+hcp <- hcp_all %>%
+  select(task_a_columns_hcp, item_string)  %>%
   mutate(id = row_number())
 
 # The pairwise correlation of the rankings given from one participant and from all other participants.
@@ -54,7 +66,7 @@ cor_all_taska %>%
   mutate(
     id1 = factor(id1, levels = cor_ave_taska$id1, ordered = TRUE),
     id2 = factor(id2, levels = cor_ave_taska$id1, ordered = TRUE)
-    ) -> cor_all_taska
+  ) -> cor_all_taska
 
 cor_all_taska %>%
   mutate(
@@ -254,16 +266,6 @@ fp_a_after_mean <- apply(fp_taska, 2, mean, na.rm=TRUE)
 fp_a_after_median <- apply(fp_taska, 2, median, na.rm=TRUE)
 
 #----------------------------------------------------------------------------------------------------
-# Health care professional dataset.
-fertility_doctors = here::here(".git/Dataset/HCP_n263.sav")
-hcp_all = haven::read_sav(fertility_doctors)
-
-colnames(hcp_all) %>%
-  grepl(pattern = '^task_a_') %>%
-  which() -> task_a_columns_1
-hcp <- hcp_all %>%
-  select(task_a_columns_1, item_string)  %>%
-  mutate(id = row_number())
 
 # The pairwise correlation of the rankings given from one participant and from all other participants.
 colnames(hcp) %>%
