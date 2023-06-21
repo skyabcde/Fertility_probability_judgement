@@ -256,7 +256,7 @@ task_a_centroid_cor_fp %>%
   # filter the centroid participant out because it is not represented properly in this data set, and we will put it in later. 
   filter(centroid_cor != max(centroid_cor))  %>%
   select(-id2) %>%
-  arrange(desc(task_a_value_assigned_fp$curve_constant))-> task_a_density_value_fp
+  arrange(desc(curve_constant))-> task_a_density_value_fp
 
 # The ration between different distributions, the bigger the ration is, the more confident we are that
 # one participant is in one cluster. 
@@ -313,158 +313,95 @@ constant_fp %>%
   add_row(reverser_fp_flipped) %>%
   add_row(centroid_fp)-> fp_taska_cleansed
 
-# Save the cleansed task A data from patients. 
+# Save the cleansed Ordering data sets from FP. 
 write.csv(fp_taska_cleansed, "Fertility_probability_judgement/Dataset/fp_taska_cleansed.csv", row.names=FALSE)
 
 
-# Next, we used the same method on the HCP sample. Detailed intro will not be included. 
-# Maximum likelihood estimation for task A ranking data from doctors.
-cor_best_taska %>% 
-  filter(best_cor != max(best_cor)) %>%
-  pull(best_cor)  -> cor_best_taska_df
+# Next, we will use the same method for the HCP sample. Detailed will not be included. 
+# Maximum likelihood estimation, HCP.
+task_a_centroid_cor_hcp %>% 
+  filter(centroid_cor != max(centroid_cor)) %>%
+  pull(centroid_cor)  -> task_a_centroid_cor_hcp_data
 
-model_esti_taska <- function(par, y) {
+task_a_mle_fun_hcp <- function(par, y) {
   n=15
   sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
   probs= exp(c(par[3:4],0))
   density = (probs[1]/sum(probs))*0.5*dbeta((y+1)/2, shape1 = exp(par[1]), shape2 = exp(par[2])) +
-    (probs[2]/sum(probs))*0.5*dbeta((y+1)/2, shape2 = exp(par[1]), shape1 = exp(par[2])) +
+    (probs[2]/sum(probs))*0.5*dbeta((y+1)/2, shape1 = exp(par[2]), shape2 = exp(par[1])) +
     (probs[3]/sum(probs))* dnorm(y,0, sd)
   -sum(log(density))
 } 
 
-parameter_esti_taska <- optim(par=c(-1,5,-1,-2), fn=model_esti_taska, y=cor_best_taska_df)
-parameter_esti_taska 
-shape_par <- exp(parameter_esti_taska$par[1:2])
-shape_par
-pi_par <- exp(parameter_esti_taska$par[3:4]) 
-pi_par
+task_a_mle_est_hcp <- optim(par=c(-1,5,-1,-2), fn=task_a_mle_fun_hcp, y=task_a_centroid_cor_hcp_data)
+beta_par_hcp <- exp(task_a_mle_est_hcp$par[1:2]) 
+prob_par_hcp <- exp(task_a_mle_est_hcp$par[3:4]) 
 
-# Plot the curves of each distribution. 
-curve(0.8749822*0.5*dbeta((x+1)/2, shape2 = shape_par[1], shape1 = shape_par[2]),from=-1, to=1, col="blue",add=TRUE)
-curve(0.02637576*0.5*dbeta((x+1)/2, shape1 = shape_par[1], shape2 = shape_par[2]),from=-1, to=1, col="red",add=TRUE)
+curve(prob_par_hcp[2]/sum(prob_par_hcp,1)*0.5*dbeta((x+1)/2, shape1 = beta_par_hcp[2], shape2 = beta_par_hcp[1]),from=-1, to=1, col="blue")
+curve(prob_par_hcp[1]/sum(prob_par_hcp,1)*0.5*dbeta((x+1)/2, shape1 = beta_par_hcp[1], shape2 = beta_par_hcp[2]),from=-1, to=1, col="red",add=TRUE)
 n=15
 sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
-curve(0.09864208*dnorm(x, 0, sd),from=-1, to=1, add = TRUE, col="green")
+curve(1/sum(prob_par_hcp,1)*dnorm(x, 0, sd),from=-1, to=1, add = TRUE, col="green")
 
-n=15
-sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
-cor_best_taska %>%
-  mutate(curve_most = 0.5*dbeta((cor_best_taska$best_cor+1)/2, shape2 = 3.55, shape1 = 23.64),
-         curve_r = 0.5*dbeta((cor_best_taska$best_cor+1)/2, shape1 = 3.55, shape2 = 23.64),
-         curve_middle = (dnorm(cor_best_taska$best_cor, 0, sd))) %>%
-  filter(best_cor != max(best_cor)) -> cor_curve_height_taska
-
-cor_curve_height_taska %>%
+# Data exclusion
+task_a_centroid_cor_hcp %>%
+  mutate(curve_constant = 0.5*dbeta((task_a_centroid_cor_hcp$centroid_cor+1)/2, shape1 = beta_par_hcp[2], shape2 = beta_par_hcp[1]),
+         curve_reverser = 0.5*dbeta((task_a_centroid_cor_hcp$centroid_cor+1)/2, shape1 = beta_par_hcp[1], shape2 = beta_par_hcp[2]),
+         curve_middle = (dnorm(task_a_centroid_cor_hcp$centroid_cor, 0, sd))) %>%
+  filter(centroid_cor != max(centroid_cor)) %>%
   select(-id2) %>%
-  arrange(desc(cor_curve_height_taska$curve_most))-> cor_h_only_taska
+  arrange(desc(curve_constant))-> task_a_density_value_hcp
 
-cor_h_only_taska  %>%
+task_a_density_value_hcp  %>%
   rowwise() %>%
-  mutate(ratio1_130 = curve_most/curve_middle,
-         ratio131_145 = curve_middle/curve_most, 
-         ratio146_148 = curve_middle/curve_r, 
-         ratio149_152 = curve_r/curve_middle,
-         ratio = NA) -> cor_h_only_taska
-cor_h_only_taska$ratio[1:130] <- cor_h_only_taska$ratio1_130[1:130]
-cor_h_only_taska$ratio[131:145] <- cor_h_only_taska$ratio131_145[131:145]
-cor_h_only_taska$ratio[146:148] <- cor_h_only_taska$ratio146_148[146:148]
-cor_h_only_taska$ratio[149:152] <- cor_h_only_taska$ratio149_152[149:152]
-cor_h_only_taska %>%
-  select(-ratio1_130, -ratio131_145, -ratio146_148, -ratio149_152) ->
-  cor_ratio
+  mutate(ratio_constant = curve_constant/curve_middle,
+         ratio_randomizer1 = curve_middle/curve_constant, 
+         ratio_randomizer2 = curve_middle/curve_reverser, 
+         ratio_reverser = curve_reverser/curve_middle,
+         ratio = NA) -> task_a_density_value_hcp
 
-cor_ratio %>%
-  arrange(desc(ratio)) %>%
-  filter(ratio>10)  -> cor_ratio
+task_a_density_value_hcp$ratio[1:130] <- task_a_density_value_hcp$ratio1_130[1:130]
+task_a_density_value_hcp$ratio[131:145] <- task_a_density_value_hcp$ratio131_145[131:145]
+task_a_density_value_hcp$ratio[146:148] <- task_a_density_value_hcp$ratio146_148[146:148]
+task_a_density_value_hcp$ratio[149:152] <- task_a_density_value_hcp$ratio149_152[149:152]
+task_a_density_value_hcp %>%
+  select(-ratio_constant, -ratio_randomizer1, -ratio_randomizer2, -ratio_reverser) ->
+  task_a_ratio_hcp
 
-cor_ratio %>%
-  filter(curve_middle< curve_most) -> cor_ratio_most
-cor_ratio_most$id1-> most_id
 
-cor_ratio %>%
-  filter(curve_middle< curve_r) -> cor_ratio_re
-cor_ratio_re$id1 -> reverser_id
+# We are interested who are constant value givers and reversers. 
+task_a_ratio_fp %>%
+  filter(curve_middle< curve_constant) -> task_a_constant_fp
+task_a_constant_fp$id1-> constant_id_fp
 
-hcp[c(reverser_id),] -> hcp_reverser
-hcp[c(most_id),] -> hcp_most
-hcp[c(hcp$id==33),] -> hcp_best_33
+task_a_ratio_hcp %>%
+  filter(curve_middle< curve_constant) -> task_a_constant_hcp
+task_a_constant_hcp$id1-> constant_id_hcp
+
+task_a_ratio_hcp %>%
+  filter(curve_middle< curve_reverser) -> task_a_reverser_hcp
+task_a_reverser_hcp$id1 -> reverser_id_hcp
+
+hcp[c(reverser_id_hcp),] -> reverser_hcp
+hcp[c(constant_id_hcp),] -> constant_hcp
+hcp[c(hcp$id==33),] -> centroid_hcp
 
 max <- 16
 mim <- 1
-(hcp_reverser[1:17] - max/2) * (-1) -> new
-new + max/2 +mim -> hcp_reverser_flipped
+(reverser_hcp[1:17] - max/2) * (-1) -> reverser_hcp_cal
+reverser_hcp_cal + max/2 +mim -> reverser_hcp_flipped
 
-hcp_reverser_flipped %>%
-  add_column(id = hcp_reverser$id) %>%
-  add_column(item_string = hcp_reverser$item_string)-> hcp_reverser_flipped
+reverser_hcp_flipped %>%
+  add_column(id = reverser_hcp$id) %>%
+  add_column(item_string = reverser_hcp$item_string)-> reverser_hcp_flipped
 
-hcp_most %>% 
-  add_row(hcp_reverser_flipped) %>%
-  add_row(hcp_best_33) -> hcp_taska
+constant_hcp %>% 
+  add_row(reverser_hcp_flipped) %>%
+  add_row(centroid_hcp) -> hcp_taska_cleansed
 
+# Save the cleansed Ordering data sets from HCP. 
+write.csv(hcp_taska_cleansed, "Fertility_probability_judgement/Dataset/hcp_taska_cleansed.csv", row.names=FALSE)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-fertility_patient = here::here(".git/Dataset/fp_taska.csv")
-fp_taska <- read.csv(fertility_patient)
-
-colnames(fp_taska) %>%
-  grepl(pattern = '^task_a_') %>%
-  which() -> task_a_columns
-expand.grid(id1 = fp_taska$id, id2 = fp_taska$id) %>% 
-  mutate(
-    cor = purrr::map2_dbl(id1, id2, function(id1, id2){
-      id1_responses = unlist(fp_taska[fp_taska$id == id1, task_a_columns])
-      id2_responses = unlist(fp_taska[fp_taska$id == id2, task_a_columns])
-      cor(id1_responses, id2_responses, method = 'k', use = 'pairwise')
-    })
-  ) %>%
-  filter(
-    !is.na(cor) 
-  ) -> cor_all_taska
-
-cor_all_taska %>%
-  filter(id1 != id2) %>% 
-  group_by(id1) %>% 
-  summarise(mean_cor = mean(cor)) %>%
-  arrange(mean_cor) %>% 
-  mutate(rank_cor = row_number()) -> cor_ave_taska 
-
-cor_all_taska %>%
-  as_tibble() %>%
-  mutate(
-    id1 = factor(id1, levels = cor_ave_taska$id1, ordered = TRUE),
-    id2 = factor(id2, levels = cor_ave_taska$id1, ordered = TRUE)
-  ) -> cor_all_taska
-
-cor_all_taska %>%
-  mutate(
-    id1 = as.integer(id1),
-    id2 = as.integer(id2)
-  ) %>%
-  ggplot(aes(x = id1, y = id2, z = cor)) + 
-  geom_contour_filled() +
-  scale_x_continuous(name = "Proportion of participants less 'typical'", expand = c(0,0)) +
-  scale_y_continuous(name = "Proportion of participants less 'typical'", expand = c(0,0)) +
-  scale_fill_viridis_d(name = "Kendall correlation") + 
-  ggtitle(ggtitle(label = "Pairwise ordinal correlations between patients"))
 
 # Descriptive analysis.
 fp <- fp[sapply(fp, is.numeric)]  
@@ -476,58 +413,6 @@ fp_taska  <- fp_taska[sapply(fp_taska, is.numeric)]
 fp_a_after_sd <- apply(fp_taska, 2, sd, na.rm=TRUE)
 fp_a_after_mean <- apply(fp_taska, 2, mean, na.rm=TRUE)
 fp_a_after_median <- apply(fp_taska, 2, median, na.rm=TRUE)
-
-#----------------------------------------------------------------------------------------------------
-
-
-
-
-# Save the cleansed task A data from doctors. 
-write.csv(hcp_taska, ".git/Dataset/hcp_taska.csv")
-
-fertility_doctors = here::here(".git/Dataset/hcp_taska.csv")
-hcp_taska <- read.csv(fertility_doctors)
-
-colnames(hcp_taska) %>%
-  grepl(pattern = '^task_a_') %>%
-  which() -> task_a_columns
-expand.grid(id1 = hcp_taska$id, id2 = hcp_taska$id) %>% 
-  mutate(
-    cor = purrr::map2_dbl(id1, id2, function(id1, id2){
-      id1_responses = unlist(hcp_taska[hcp_taska$id == id1, task_a_columns])
-      id2_responses = unlist(hcp_taska[hcp_taska$id == id2, task_a_columns])
-      cor(id1_responses, id2_responses, method = 'k', use = 'pairwise')
-    })
-  ) %>%
-  filter(
-    !is.na(cor) 
-  ) -> cor_all_taska
-
-cor_all_taska %>%
-  filter(id1 != id2) %>% 
-  group_by(id1) %>% 
-  summarise(mean_cor = mean(cor)) %>%
-  arrange(mean_cor) %>% 
-  mutate(rank_cor = row_number()) -> cor_ave_taska 
-
-cor_all_taska %>%
-  as_tibble() %>%
-  mutate(
-    id1 = factor(id1, levels = cor_ave_taska$id1, ordered = TRUE),
-    id2 = factor(id2, levels = cor_ave_taska$id1, ordered = TRUE)
-  ) -> cor_all_taska
-
-cor_all_taska %>%
-  mutate(
-    id1 = as.integer(id1),
-    id2 = as.integer(id2)
-  ) %>%
-  ggplot(aes(x = id1, y = id2, z = cor)) + 
-  geom_contour_filled() +
-  scale_x_continuous(name = "Proportion of participants less 'typical'", expand = c(0,0)) +
-  scale_y_continuous(name = "Proportion of participants less 'typical'", expand = c(0,0)) +
-  scale_fill_viridis_d(name = "Kendall correlation") + 
-  ggtitle(ggtitle(label = "Pairwise ordinal correlations between doctors"))
 
 # Descriptive analysis.
 hcp <- hcp[sapply(hcp, is.numeric)]  

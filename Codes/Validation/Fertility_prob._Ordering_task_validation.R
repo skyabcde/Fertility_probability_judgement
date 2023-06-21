@@ -313,7 +313,7 @@ constant_fp %>%
   add_row(reverser_fp_flipped) %>%
   add_row(centroid_fp)-> fp_taska_cleansed
 
-# Save the cleansed task A data from patients. 
+# Save the cleansed Ordering data sets from FP. 
 write.csv(fp_taska_cleansed, "Fertility_probability_judgement/Dataset/fp_taska_cleansed.csv", row.names=FALSE)
 
 
@@ -354,84 +354,57 @@ task_a_centroid_cor_hcp %>%
 
 task_a_density_value_hcp  %>%
   rowwise() %>%
-  mutate(ratio1_130 = curve_constant/curve_middle,
-         ratio131_145 = curve_middle/curve_constant, 
-         ratio146_148 = curve_middle/curve_reverser, 
-         ratio149_152 = curve_reverser/curve_middle,
-         ratio = NA) -> task_a_density_value_hcp
-
-## 
-task_a_density_value_fp  %>%
-  rowwise() %>%
   mutate(ratio_constant = curve_constant/curve_middle,
          ratio_randomizer1 = curve_middle/curve_constant, 
          ratio_randomizer2 = curve_middle/curve_reverser, 
          ratio_reverser = curve_reverser/curve_middle,
-         ratio = NA) -> task_a_density_value_fp
+         ratio = NA) -> task_a_density_value_hcp
+
+task_a_density_value_hcp$ratio[1:130] <- task_a_density_value_hcp$ratio1_130[1:130]
+task_a_density_value_hcp$ratio[131:145] <- task_a_density_value_hcp$ratio131_145[131:145]
+task_a_density_value_hcp$ratio[146:148] <- task_a_density_value_hcp$ratio146_148[146:148]
+task_a_density_value_hcp$ratio[149:152] <- task_a_density_value_hcp$ratio149_152[149:152]
+task_a_density_value_hcp %>%
+  select(-ratio_constant, -ratio_randomizer1, -ratio_randomizer2, -ratio_reverser) ->
+  task_a_ratio_hcp
 
 
+# We are interested who are constant value givers and reversers. 
+task_a_ratio_fp %>%
+  filter(curve_middle< curve_constant) -> task_a_constant_fp
+task_a_constant_fp$id1-> constant_id_fp
 
+task_a_ratio_hcp %>%
+  filter(curve_middle< curve_constant) -> task_a_constant_hcp
+task_a_constant_hcp$id1-> constant_id_hcp
 
+task_a_ratio_hcp %>%
+  filter(curve_middle< curve_reverser) -> task_a_reverser_hcp
+task_a_reverser_hcp$id1 -> reverser_id_hcp
 
-
-
-
-cor_h_only_taska$ratio[1:130] <- cor_h_only_taska$ratio1_130[1:130]
-cor_h_only_taska$ratio[131:145] <- cor_h_only_taska$ratio131_145[131:145]
-cor_h_only_taska$ratio[146:148] <- cor_h_only_taska$ratio146_148[146:148]
-cor_h_only_taska$ratio[149:152] <- cor_h_only_taska$ratio149_152[149:152]
-cor_h_only_taska %>%
-  select(-ratio1_130, -ratio131_145, -ratio146_148, -ratio149_152) ->
-  cor_ratio
-
-cor_ratio %>%
-  arrange(desc(ratio)) %>%
-  filter(ratio>10)  -> cor_ratio
-
-cor_ratio %>%
-  filter(curve_middle< curve_most) -> cor_ratio_most
-cor_ratio_most$id1-> most_id
-
-cor_ratio %>%
-  filter(curve_middle< curve_r) -> cor_ratio_re
-cor_ratio_re$id1 -> reverser_id
-
-hcp[c(reverser_id),] -> hcp_reverser
-hcp[c(most_id),] -> hcp_most
-hcp[c(hcp$id==33),] -> hcp_best_33
+hcp[c(reverser_id_hcp),] -> reverser_hcp
+hcp[c(constant_id_hcp),] -> constant_hcp
+hcp[c(hcp$id==33),] -> centroid_hcp
 
 max <- 16
 mim <- 1
-(hcp_reverser[1:17] - max/2) * (-1) -> new
-new + max/2 +mim -> hcp_reverser_flipped
+(reverser_hcp[1:17] - max/2) * (-1) -> reverser_hcp_cal
+reverser_hcp_cal + max/2 +mim -> reverser_hcp_flipped
 
-hcp_reverser_flipped %>%
-  add_column(id = hcp_reverser$id) %>%
-  add_column(item_string = hcp_reverser$item_string)-> hcp_reverser_flipped
+reverser_hcp_flipped %>%
+  add_column(id = reverser_hcp$id) %>%
+  add_column(item_string = reverser_hcp$item_string)-> reverser_hcp_flipped
 
-hcp_most %>% 
-  add_row(hcp_reverser_flipped) %>%
-  add_row(hcp_best_33) -> hcp_taska
+constant_hcp %>% 
+  add_row(reverser_hcp_flipped) %>%
+  add_row(centroid_hcp) -> hcp_taska_cleansed
 
-
-
-
-
+# Save the cleansed Ordering data sets from HCP. 
+write.csv(hcp_taska_cleansed, "Fertility_probability_judgement/Dataset/hcp_taska_cleansed.csv", row.names=FALSE)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
+# Verification. 
 fertility_patient = here::here(".git/Dataset/fp_taska.csv")
 fp_taska <- read.csv(fertility_patient)
 
