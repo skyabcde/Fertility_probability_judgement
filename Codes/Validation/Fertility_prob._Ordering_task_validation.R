@@ -14,9 +14,13 @@ theme_set(theme_bw())
 theme_set(theme_classic())
 
 
-# Load Fertililty patients dataset.
-fertility_patient = here::here("datasets/FP_n281.sav")
+# Load Fertility patients dataset.
+fertility_patient = here::here("Fertility_probability_judgement/Dataset/FP_n281.sav")
 fp_all = haven::read_sav(fertility_patient)
+
+# Load Fertility doctors dataset.
+
+
 
 colnames(fp_all) %>%
   grepl(pattern = '^task_a_') %>%
