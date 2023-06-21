@@ -256,7 +256,7 @@ task_a_centroid_cor_fp %>%
   # filter the centroid participant out because it is not represented properly in this data set, and we will put it in later. 
   filter(centroid_cor != max(centroid_cor))  %>%
   select(-id2) %>%
-  arrange(desc(task_a_value_assigned_fp$curve_constant))-> task_a_density_value_fp
+  arrange(desc(curve_constant))-> task_a_density_value_fp
 
 # The ration between different distributions, the bigger the ration is, the more confident we are that
 # one participant is in one cluster. 
@@ -317,55 +317,65 @@ constant_fp %>%
 write.csv(fp_taska_cleansed, "Fertility_probability_judgement/Dataset/fp_taska_cleansed.csv", row.names=FALSE)
 
 
-# Next, we used the same method on the HCP sample. Detailed intro will not be included. 
-# Maximum likelihood estimation for task A ranking data from doctors.
-cor_best_taska %>% 
-  filter(best_cor != max(best_cor)) %>%
-  pull(best_cor)  -> cor_best_taska_df
+# Next, we will use the same method for the HCP sample. Detailed will not be included. 
+# Maximum likelihood estimation, HCP.
+task_a_centroid_cor_hcp %>% 
+  filter(centroid_cor != max(centroid_cor)) %>%
+  pull(centroid_cor)  -> task_a_centroid_cor_hcp_data
 
-model_esti_taska <- function(par, y) {
+task_a_mle_fun_hcp <- function(par, y) {
   n=15
   sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
   probs= exp(c(par[3:4],0))
   density = (probs[1]/sum(probs))*0.5*dbeta((y+1)/2, shape1 = exp(par[1]), shape2 = exp(par[2])) +
-    (probs[2]/sum(probs))*0.5*dbeta((y+1)/2, shape2 = exp(par[1]), shape1 = exp(par[2])) +
+    (probs[2]/sum(probs))*0.5*dbeta((y+1)/2, shape1 = exp(par[2]), shape2 = exp(par[1])) +
     (probs[3]/sum(probs))* dnorm(y,0, sd)
   -sum(log(density))
 } 
 
-parameter_esti_taska <- optim(par=c(-1,5,-1,-2), fn=model_esti_taska, y=cor_best_taska_df)
-parameter_esti_taska 
-shape_par <- exp(parameter_esti_taska$par[1:2])
-shape_par
-pi_par <- exp(parameter_esti_taska$par[3:4]) 
-pi_par
+task_a_mle_est_hcp <- optim(par=c(-1,5,-1,-2), fn=task_a_mle_fun_hcp, y=task_a_centroid_cor_hcp_data)
+beta_par_hcp <- exp(task_a_mle_est_hcp$par[1:2]) 
+prob_par_hcp <- exp(task_a_mle_est_hcp$par[3:4]) 
 
-# Plot the curves of each distribution. 
-curve(0.8749822*0.5*dbeta((x+1)/2, shape2 = shape_par[1], shape1 = shape_par[2]),from=-1, to=1, col="blue",add=TRUE)
-curve(0.02637576*0.5*dbeta((x+1)/2, shape1 = shape_par[1], shape2 = shape_par[2]),from=-1, to=1, col="red",add=TRUE)
+curve(prob_par_hcp[2]/sum(prob_par_hcp,1)*0.5*dbeta((x+1)/2, shape1 = beta_par_hcp[2], shape2 = beta_par_hcp[1]),from=-1, to=1, col="blue")
+curve(prob_par_hcp[1]/sum(prob_par_hcp,1)*0.5*dbeta((x+1)/2, shape1 = beta_par_hcp[1], shape2 = beta_par_hcp[2]),from=-1, to=1, col="red",add=TRUE)
 n=15
 sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
-curve(0.09864208*dnorm(x, 0, sd),from=-1, to=1, add = TRUE, col="green")
+curve(1/sum(prob_par_hcp,1)*dnorm(x, 0, sd),from=-1, to=1, add = TRUE, col="green")
 
-n=15
-sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
-cor_best_taska %>%
-  mutate(curve_most = 0.5*dbeta((cor_best_taska$best_cor+1)/2, shape2 = 3.55, shape1 = 23.64),
-         curve_r = 0.5*dbeta((cor_best_taska$best_cor+1)/2, shape1 = 3.55, shape2 = 23.64),
-         curve_middle = (dnorm(cor_best_taska$best_cor, 0, sd))) %>%
-  filter(best_cor != max(best_cor)) -> cor_curve_height_taska
-
-cor_curve_height_taska %>%
+# Data exclusion
+task_a_centroid_cor_hcp %>%
+  mutate(curve_constant = 0.5*dbeta((task_a_centroid_cor_hcp$centroid_cor+1)/2, shape1 = beta_par_hcp[2], shape2 = beta_par_hcp[1]),
+         curve_reverser = 0.5*dbeta((task_a_centroid_cor_hcp$centroid_cor+1)/2, shape1 = beta_par_hcp[1], shape2 = beta_par_hcp[2]),
+         curve_middle = (dnorm(task_a_centroid_cor_hcp$centroid_cor, 0, sd))) %>%
+  filter(centroid_cor != max(centroid_cor)) %>%
   select(-id2) %>%
-  arrange(desc(cor_curve_height_taska$curve_most))-> cor_h_only_taska
+  arrange(desc(curve_constant))-> task_a_density_value_hcp
 
-cor_h_only_taska  %>%
+task_a_density_value_hcp  %>%
   rowwise() %>%
-  mutate(ratio1_130 = curve_most/curve_middle,
-         ratio131_145 = curve_middle/curve_most, 
-         ratio146_148 = curve_middle/curve_r, 
-         ratio149_152 = curve_r/curve_middle,
-         ratio = NA) -> cor_h_only_taska
+  mutate(ratio1_130 = curve_constant/curve_middle,
+         ratio131_145 = curve_middle/curve_constant, 
+         ratio146_148 = curve_middle/curve_reverser, 
+         ratio149_152 = curve_reverser/curve_middle,
+         ratio = NA) -> task_a_density_value_hcp
+
+## 
+task_a_density_value_fp  %>%
+  rowwise() %>%
+  mutate(ratio_constant = curve_constant/curve_middle,
+         ratio_randomizer1 = curve_middle/curve_constant, 
+         ratio_randomizer2 = curve_middle/curve_reverser, 
+         ratio_reverser = curve_reverser/curve_middle,
+         ratio = NA) -> task_a_density_value_fp
+
+
+
+
+
+
+
+
 cor_h_only_taska$ratio[1:130] <- cor_h_only_taska$ratio1_130[1:130]
 cor_h_only_taska$ratio[131:145] <- cor_h_only_taska$ratio131_145[131:145]
 cor_h_only_taska$ratio[146:148] <- cor_h_only_taska$ratio146_148[146:148]
