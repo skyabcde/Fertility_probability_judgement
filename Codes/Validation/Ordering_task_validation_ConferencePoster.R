@@ -12,7 +12,6 @@ library(ggplot2)
 library(ggridges) # PlackettLuce
 library(PlackettLuce) # PlackettLuce
 
-
 theme_set(theme_bw())
 theme_set(theme_classic())
 
@@ -30,10 +29,10 @@ theme_set(theme_classic())
 # Load raw data sets.
 fertility_patient = here::here("Fertility_probability_judgement/Dataset/FP_n281.sav")
 fp_allraw = haven::read_sav(fertility_patient)
-colnames(fp_all) %>%
+colnames(fp_allraw) %>%
   grepl(pattern = '^task_a_') %>%
   which() -> task_a_columns_allraw
-fp_all <- fp_all %>%
+fp_all <- fp_allraw %>%
   select(all_of(task_a_columns_allraw), item_string)  %>%
   mutate(id = row_number())
 colnames(fp_all) %>%
@@ -46,35 +45,11 @@ fertility_patient_cleanta = here::here("Fertility_probability_judgement/Dataset/
 fp_ta = read.csv(fertility_patient_cleanta)
 fertility_patient_cleantb = here::here("Fertility_probability_judgement/Dataset/fp_taskb.csv")
 fp_tb = read.csv(fertility_patient_cleantb)
+colnames(fp_ta) %>%
+  grepl(pattern = '^task_a_') %>%
+  which() -> task_a_columns_ta
 
 # First, presentation of latent clustering. 
-# Distributions graph.
-task_a_centroid_cor_all %>% 
-  filter(centroid_cor != max(centroid_cor)) %>% 
-  pull(centroid_cor)  -> task_a_centroid_cor_all
-
-hist(task_a_centroid_cor_all,freq = FALSE,breaks = 20)  
-
-task_a_mle_fun_all <- function(par, y) {
-  n=15
-  sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
-  probs= exp(c(par[3:4],0))
-  density = (probs[1]/sum(probs))*0.5*dbeta((y+1)/2, shape1 = exp(par[1]), shape2 = exp(par[2])) +
-    (probs[2]/sum(probs))*0.5*dbeta((y+1)/2, shape1 = exp(par[2]), shape2 = exp(par[1])) +
-    (probs[3]/sum(probs))* dnorm(y,0, sd)
-  -sum(log(density))
-} 
-
-task_a_mle_est_all <- optim(par=c(-1,5,-1,-2), fn=task_a_mle_fun_all, y=task_a_centroid_cor_all)
-beta_par_all <- exp(task_a_mle_est_all$par[1:2]) 
-prob_par_all <- exp(task_a_mle_est_all$par[3:4]) 
-
-curve(prob_par_all[2]/sum(prob_par_all,1)*0.5*dbeta((x+1)/2, shape1 = beta_par_all[2], shape2 = beta_par_all[1]),from=-1, to=1, col="blue",add=TRUE)
-curve(prob_par_all[1]/sum(prob_par_all,1)*0.5*dbeta((x+1)/2, shape1 = beta_par_all[1], shape2 = beta_par_all[2]),from=-1, to=1, col="red",add=TRUE)
-n=15
-sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
-curve(1/sum(prob_par_all,1)*dnorm(x, 0, sd),from=-1, to=1, add = TRUE, col="green")
-
 # Scatterplot
 data.frame(id1 = fp_all$id) %>% 
   mutate(
@@ -104,108 +79,169 @@ expand.grid(id1 = fp_all$id, id2 = 14) %>%
     !is.na(centroid_cor) 
   ) -> task_a_centroid_cor_all
 
-task_a_centroid_cor_all %>% 
-  left_join(task_a_ori_cor_all, by="id1") -> task_a_cor_centroid_ori_all 
-task_a_cor_centroid_ori_all %>% ggplot(aes(centroid_cor, item_string_cor)) +
-  geom_point() +
-  theme_minimal()+
-  labs(title = 'Scatterplot of the patients sample', x = 'Correlation w/ centroid', y = 'Correlation w/ random start') 
+expand.grid(id1 = fp_ta$id, id2 = 14) %>%
+  mutate(
+    centroid_cor = purrr::map2_dbl(id1, id2, function(id1, id2){
+      id1_responses = unlist(fp_ta[fp_ta$id == id1, task_a_columns_ta])
+      id2_responses = unlist(fp_ta[fp_ta$id == id2, task_a_columns_ta])
+      cor(id1_responses, id2_responses, method = 'k', use = 'pairwise')
+    })
+  ) %>%
+  filter(
+    !is.na(centroid_cor) 
+  ) -> task_a_centroid_cor_ta
 
+
+# Distributions graph (RAW).
+task_a_centroid_cor_all %>% 
+  filter(centroid_cor != max(centroid_cor)) %>% 
+  pull(centroid_cor)  -> task_a_centroid_cor_all_pulled
+
+hist(task_a_centroid_cor_all_pulled,freq = FALSE,breaks = 20, xlim = c(-1,1), ylim = c(0,8))  
+
+task_a_mle_fun_all <- function(par, y) {
+  n=15
+  sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
+  probs= exp(c(par[3:4],0))
+  density = (probs[1]/sum(probs))*0.5*dbeta((y+1)/2, shape1 = exp(par[1]), shape2 = exp(par[2])) +
+    (probs[2]/sum(probs))*0.5*dbeta((y+1)/2, shape1 = exp(par[2]), shape2 = exp(par[1])) +
+    (probs[3]/sum(probs))* dnorm(y,0, sd)
+  -sum(log(density))
+} 
+
+task_a_mle_est_all <- optim(par=c(-1,5,-1,-2), fn=task_a_mle_fun_all, y=task_a_centroid_cor_all_pulled)
+beta_par_all <- exp(task_a_mle_est_all$par[1:2]) 
+prob_par_all <- exp(task_a_mle_est_all$par[3:4]) 
+
+curve(prob_par_all[2]/sum(prob_par_all,1)*0.5*dbeta((x+1)/2, shape1 = beta_par_all[2], shape2 = beta_par_all[1]),from=-1, to=1, col="blue",add=TRUE)
+curve(prob_par_all[1]/sum(prob_par_all,1)*0.5*dbeta((x+1)/2, shape1 = beta_par_all[1], shape2 = beta_par_all[2]),from=-1, to=1, col="red",add=TRUE)
+n=15
+sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
+curve(1/sum(prob_par_all,1)*dnorm(x, 0, sd),from=-1, to=1, add = TRUE, col="green")
+
+# Distributions graph (CLEAN).
+task_a_centroid_cor_ta %>% 
+  filter(centroid_cor != max(centroid_cor)) %>% 
+  pull(centroid_cor)  -> task_a_centroid_cor_ta
+
+hist(task_a_centroid_cor_ta,freq = FALSE,breaks = 20, xlim = c(-1,1), ylim = c(0,8))  
+
+
+task_a_mle_fun_ta <- function(par, y) {
+  n=15
+  sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
+  probs= exp(c(par[3:4],0))
+  density = (probs[1]/sum(probs))*0.5*dbeta((y+1)/2, shape1 = exp(par[1]), shape2 = exp(par[2])) +
+    (probs[2]/sum(probs))*0.5*dbeta((y+1)/2, shape1 = exp(par[2]), shape2 = exp(par[1])) +
+    (probs[3]/sum(probs))* dnorm(y,0, sd)
+  -sum(log(density))
+} 
+
+task_a_mle_est_ta <- optim(par=c(-1,5,-1,-2), fn=task_a_mle_fun_ta, y=task_a_centroid_cor_ta)
+beta_par_ta <- exp(task_a_mle_est_all$par[1:2]) 
+prob_par_ta <- exp(task_a_mle_est_all$par[3:4]) 
+
+curve(prob_par_ta[2]/sum(prob_par_ta,1)*0.5*dbeta((x+1)/2, shape1 = beta_par_ta[2], shape2 = beta_par_ta[1]),from=-1, to=1, col="blue",add=TRUE)
+curve(prob_par_ta[1]/sum(prob_par_ta,1)*0.5*dbeta((x+1)/2, shape1 = beta_par_ta[1], shape2 = beta_par_ta[2]),from=-1, to=1, col="red",add=TRUE)
+n=15
+sd=sqrt(2*(2*n+5)/(9*n*(n-1)))
+curve(1/sum(prob_par_ta,1)*dnorm(x, 0, sd),from=-1, to=1, add = TRUE, col="green")
 
 ### codes below add color to the scatterplot
 # Finished the data clustering based on participants' cluster.  
-task_a_centroid_cor_fp %>%
-  mutate(curve_constant = 0.5*dbeta((task_a_centroid_cor_fp$centroid_cor+1)/2, shape1 = beta_par_fp[2], shape2 = beta_par_fp[1]),
-         curve_reverser = 0.5*dbeta((task_a_centroid_cor_fp$centroid_cor+1)/2, shape1 = beta_par_fp[1], shape2 = beta_par_fp[2]),
-         curve_middle = (dnorm(task_a_centroid_cor_fp$centroid_cor, 0, sd))) %>%
+task_a_centroid_cor_all %>% 
+  mutate(curve_constant = 0.5*dbeta((task_a_centroid_cor_all$centroid_cor+1)/2, shape1 = beta_par_all[2], shape2 = beta_par_all[1]),
+         curve_reverser = 0.5*dbeta((task_a_centroid_cor_all$centroid_cor+1)/2, shape1 = beta_par_all[1], shape2 = beta_par_all[2]),
+         curve_middle = (dnorm(task_a_centroid_cor_all$centroid_cor, 0, sd))) %>%
   # filter the centroid participant out because it is not represented properly in this data set, and we will put it in later. 
   filter(centroid_cor != max(centroid_cor))  %>%
   select(-id2) %>%
-  arrange(desc(curve_constant))-> task_a_density_value_fp
+  arrange(desc(curve_constant))-> task_a_density_value_all
 
 # The ration between different distributions, the bigger the ration is, the more confident we are that
 # one participant is in one cluster. 
-task_a_density_value_fp  %>%
+task_a_density_value_all  %>%
   rowwise() %>%
   mutate(ratio_constant = curve_constant/curve_middle,
          ratio_randomizer1 = curve_middle/curve_constant, 
          ratio_randomizer2 = curve_middle/curve_reverser, 
          ratio_reverser = curve_reverser/curve_middle,
-         ratio = NA) -> task_a_density_value_fp
+         ratio = NA) -> task_a_density_value_all
 # From 1-162, curve_constant > curve_middle.
-task_a_density_value_fp$ratio[1:162] <- task_a_density_value_fp$ratio_constant[1:162]
+task_a_density_value_all$ratio[1:162] <- task_a_density_value_all$ratio_constant[1:162]
 # From 163-180, curve_middle > curve_constant.
-task_a_density_value_fp$ratio[163:180] <- task_a_density_value_fp$ratio_randomizer1[163:180]
+task_a_density_value_all$ratio[163:180] <- task_a_density_value_all$ratio_randomizer1[163:180]
 # From 181-192, curve_middle > curve_reverser.
-task_a_density_value_fp$ratio[181:192] <- task_a_density_value_fp$ratio_randomizer2[181:192]
+task_a_density_value_all$ratio[181:192] <- task_a_density_value_all$ratio_randomizer2[181:192]
 # From 193-202, curve_reverser > curve_middle.
-task_a_density_value_fp$ratio[193:202] <- task_a_density_value_fp$ratio_reverser[193:202]
-task_a_density_value_fp %>%
+task_a_density_value_all$ratio[193:202] <- task_a_density_value_all$ratio_reverser[193:202]
+task_a_density_value_all %>%
   select(-ratio_constant, -ratio_randomizer1, -ratio_randomizer2, -ratio_reverser) ->
-  task_a_ratio_fp
+  task_a_ratio_all
 
-task_a_ratio_fp %>%
+task_a_ratio_all %>%
   arrange(desc(ratio)) %>%
   # We filter any ration values under 10, meaning we don't have enough confidence which cluster 
   # they should be put in.
-  filter(ratio>10) -> task_a_ratio_fp
+  filter(ratio>10) -> task_a_ratio_included
 
 # We are interested who are constant value givers and reversers. 
-task_a_ratio_fp %>%
-  filter(curve_middle< curve_constant) -> task_a_constant_fp
-task_a_constant_fp$id1-> constant_id_fp
+task_a_ratio_included %>%
+  filter(curve_middle< curve_constant) -> task_a_constant_all
+task_a_constant_all$id1-> constant_id_all
 
-task_a_ratio_fp %>%
-  filter(curve_middle< curve_reverser) -> task_a_reverser_fp
-task_a_reverser_fp$id1 -> reverser_id_fp
+task_a_ratio_included %>%
+  filter(curve_middle< curve_reverser) -> task_a_reverser_1
+task_a_reverser_1$id1 -> reverser_id1
+task_a_ratio_included %>%
+  filter(curve_reverser> curve_constant) -> task_a_reverser_2
+task_a_reverser_2$id1 -> reverser_id2
 
-fp[c(constant_id_fp),] -> constant_fp
-fp[c(reverser_id_fp),] -> reverser_fp
-fp[c(fp$id==14),] -> centroid_fp
-
-cor_ratio_fp %>%
+task_a_ratio_all %>%
   arrange(desc(ratio)) %>%
   filter(ratio <10)  %>%
   filter(ratio >1) -> randomizer_1
-randomizer_1$id1 -> randomizer_1_id
+randomizer_1$id1 -> randomizer_id1
 
-cor_ratio_fp %>%
-  arrange(desc(ratio)) %>%
-  filter(ratio>10)  -> fp_data
-fp_data %>%
-  filter(curve_middle> curve_most) %>%
-  filter(curve_middle> curve_r)-> randomizer_2
-randomizer_2$id1 -> randomizer_2_id
+task_a_ratio_included %>%
+  filter(curve_middle> curve_constant) %>%
+  filter(curve_middle> curve_reverser)-> randomizer_2
+randomizer_2$id1 -> randomizer_id2
 
-fp_data %>%
-  filter(curve_r> curve_most) -> reverser
-reverser$id1 -> reverser_id
-
+fp_all[c(constant_id_all),] -> constant
+fp_all[c(reverser_id1),] -> reverser_1
+fp_all[c(reverser_id2),] -> reverser_2
+fp_all[c(fp_all$id==14),] -> centroid_all
 
 fp_allraw %>% mutate(id=row_number()) -> fp_allraw
-
-fp_all[c(randomizer_1_id),] -> randomizer_1
-fp_all[c(randomizer_2_id),] -> randomizer_2
-fp_all[c(reverser_id),] -> reverser
+fp_allraw[c(randomizer_id1),] -> randomizer_1
+fp_allraw[c(randomizer_id2),] -> randomizer_2
+fp_allraw[c(reverser_id1),] -> reverser
+fp_allraw[c(reverser_id2),] -> reverser
 
 randomizer_1 %>% add_row(randomizer_2)-> randomizer
+reverser_1 %>% add_row(reverser_2)-> reverser
+
 randomizer$id -> randomizer_id
 reverser$id -> reverser_id
+constant$id -> constant_id
 
-cor_best_taska_fp %>% 
-  left_join(cors_item_taska_fp, by="id1") -> joined_cor_best_item_taska_fp
+task_a_centroid_cor_all %>% 
+  left_join(task_a_ori_cor_all, by="id1") -> task_a_cor_centroid_ori_all 
 
-joined_cor_best_item_taska_fp %>% 
+task_a_cor_centroid_ori_all %>% 
   mutate(Clustering = case_when(
-    id1 %in% c(randomizer_id) ~ "Randomizers",
-    id1 %in% c(reverser_id) ~ "Reversers",
-    TRUE ~ "Constant value giver")) -> a
+    id1 %in% c(randomizer_id) ~ "1Randomizers",
+    id1 %in% c(reverser_id) ~ "2Reversers",
+    TRUE ~ "3Constant value giver")) -> a
 
 dev.off()
 # <Figure 3> Scatterplot b/w best and item ranking cor (patients). 
-a %>% ggplot(aes(best_cor_fp, item_string_cor_fp, col= Clustering)) +
+a %>% ggplot(aes(centroid_cor, item_string_cor, col= Clustering)) +
   geom_point() +
+  theme_minimal()+
   labs(title = 'Scatterplot of raw FP sample', x = 'Corr. w/ centroid', y = 'Corr. w/ random start') 
+
 
 
 # Second, we want to see the pairwise correlation graph for both raw and clean data, FP.
@@ -338,6 +374,7 @@ plot(qv_fp,
      main = "Terms ordering by Plackett-Luce model (BEFORE)",
      xaxt="n", xlim = c(1, 17), ylim = c(-6,6))
 axis(1, at = seq_len(17), labels = term_order_fp, las = 2, cex.axis = 0.6)
+
 coefs_pl_fp <- round(coef(pmodel_fp), 2) %>% sort()
 
 
