@@ -186,12 +186,13 @@ t.test(X2_permute, mu = sum(X2_real$X2)) # Is this correct?
 # t = -328.58, df = 9999, p-value < 2.2e-16
 
 hist(X2_permute, xlim = c(100, 300), 
-     xlab = "summed Chi-squared scores for 10,000 ramdonmized permutation")
-abline(v=sum(X2_real$X2),
-       col="dodgerblue3",
-       lty=2,
-       lwd=2)
-abline(v = c(quantile(X2_permute,.025), quantile(X2_permute,.975)), col = "blue", lty = 2, lwd = 2)
+     xlab = "summed likelihood ratio scores for 10,000 ramdonmized permutation")
+abline(v= sum(X2_real$X2),
+       col="red",
+       lty=2, lwd=2)
+abline(v = c(quantile(X2_permute,.025), 
+             quantile(X2_permute,.975)), 
+       col = "blue", lty = 2, lwd = 2)
 
 getwd()
 
@@ -214,7 +215,7 @@ fpb <- as.data.frame(apply(fpb, 2, as.numeric), na.rm = TRUE) %>% round(digits=0
 sapply(hcpb, class) 
 hcpb <- as.data.frame(apply(hcpb, 2, as.numeric), na.rm = TRUE) %>% round(digits=0)
 
-# Clear subjects with no answers.
+# Cleasen subjects with no answers.
 fpb <- 
   fpb %>% 
   filter(!is.na(task_b_unlikely) & !is.na(task_b_almost_certainly))
@@ -222,6 +223,8 @@ fpb <-
 hcpb <- 
   hcpb %>% 
   filter(!is.na(task_b_unlikely) & !is.na(task_b_almost_certainly))
+
+# Someone who has no answers in both terms was eliminated. 
 
 # Convert data to long format and eliminate unnecessary term names. 
 fpb_long <- pivot_longer(fpb, -id, names_to="term", values_to = "number") 
@@ -306,7 +309,7 @@ permute_results_10k <- replicate (10000, simplify = FALSE,
 
 save(permuteb_10k, file = "permute_number_10k.rda") 
 #  set.seed(10)
-base::load("Fertility_probability_judgement/permute_10k.rda")
+base::load("Fertility_probability_judgement/permute_number_10k.rda")
 
 permuteb_10k %>%
   purrr::map_dbl(function(df){ 
@@ -315,6 +318,32 @@ permuteb_10k %>%
 
 
 ################################################################################
+quantile(permuteb_stats,.025)
+#1.144724  
+quantile(permuteb_stats,.975)
+#1.844779 
+sum(number_real$D)
+# 3.515878
+t.test(permuteb_stats, mu = sum(number_real$D)) # Is this correct?  
+#One Sample t-test
+#data:  permuteb_stats
+#t = -1161.2, df = 9999, p-value < 2.2e-16
+#alternative hypothesis: true mean is not equal to 3.515878
+#95 percent confidence interval:
+#  1.432061 1.439085
+#sample estimates:
+#  mean of x 
+#1.435573 
+
+hist(permuteb_stats, xlim = c(0.8, 4.0), 
+       xlab = "summed D scores for 10,000 ramdonmized permutation")
+abline(v= sum(number_real$D),
+       col="red", lty=2, lwd=2)
+abline(v = c(quantile(permuteb_stats,.025), 
+             quantile(permuteb_stats,.975)), 
+       col = "blue", lty = 2, lwd = 2)
+
+getwd()
 
 
 ################################################################################
